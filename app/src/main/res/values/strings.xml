@@ -2,7 +2,6 @@
     <string name="app_name">AleJabber</string>
 
     <!-- Navigation -->
-    <string name="nav_contacts">Contacts</string>
     <string name="nav_rooms">Rooms</string>
     <string name="nav_accounts">Accounts</string>
     <string name="nav_settings">Settings</string>
@@ -17,12 +16,6 @@
     <string name="account_server">Server</string>
     <string name="account_port">Port</string>
     <string name="account_use_tls">Use TLS</string>
-    <string name="account_status_online">Online</string>
-    <string name="account_status_offline">Offline</string>
-    <string name="account_status_connecting">Connecting…</string>
-    <string name="account_status_error">Connection Error</string>
-    <string name="account_connect">Connect</string>
-    <string name="account_disconnect">Disconnect</string>
     <string name="account_no_accounts">No accounts configured.\nTap + to add one.</string>
     <string name="account_delete_confirm">Delete account %1$s?</string>
     <string name="account_jid_hint">user@example.com</string>
@@ -36,38 +29,23 @@
     <string name="add_contact">Add Contact</string>
     <string name="contact_jid">Jabber ID (JID)</string>
     <string name="contact_nickname">Nickname</string>
-    <string name="contact_remove">Remove Contact</string>
-    <string name="contact_block">Block Contact</string>
-    <string name="contact_status_online">Online</string>
-    <string name="contact_status_away">Away</string>
-    <string name="contact_status_dnd">Do Not Disturb</string>
-    <string name="contact_status_offline">Offline</string>
 
     <!-- Rooms / MUC -->
     <string name="rooms_title">Rooms</string>
-    <string name="rooms_search">Search rooms…</string>
     <string name="rooms_empty">No rooms joined yet.</string>
     <string name="join_room">Join Room</string>
     <string name="room_jid">Room JID</string>
     <string name="room_nickname">Your Nickname</string>
-    <string name="room_password">Room Password (optional)</string>
+    <string name="room_password">Room Password</string>
     <string name="leave_room">Leave Room</string>
-    <string name="room_participants">Participants</string>
-    <string name="room_topic">Topic</string>
-    <string name="browse_rooms">Browse Rooms</string>
 
     <!-- Chat -->
     <string name="chat_hint">Type a message…</string>
     <string name="chat_send">Send</string>
     <string name="chat_attach">Attach file</string>
     <string name="chat_record_audio">Record audio</string>
-    <string name="chat_stop_recording">Stop recording</string>
     <string name="chat_send_audio">Send audio</string>
     <string name="chat_cancel_audio">Cancel audio</string>
-    <string name="chat_encryption_none">No encryption</string>
-    <string name="chat_encryption_otr">OTR</string>
-    <string name="chat_encryption_omemo">OMEMO</string>
-    <string name="chat_encryption_pgp">OpenPGP</string>
     <string name="chat_encryption_select">Select encryption</string>
     <string name="chat_message_delivered">Delivered</string>
     <string name="chat_message_read">Read</string>
@@ -75,17 +53,9 @@
     <string name="chat_message_failed">Failed to send</string>
     <string name="chat_typing">%1$s is typing…</string>
     <string name="chat_media_image">Image</string>
-    <string name="chat_media_video">Video</string>
     <string name="chat_media_audio">Audio</string>
     <string name="chat_media_file">File</string>
-    <string name="chat_media_uploading">Uploading…</string>
-    <string name="chat_media_download">Download</string>
     <string name="chat_empty">No messages yet.\nSay hello!</string>
-    <string name="chat_otr_started">OTR session started. Your conversation is now encrypted.</string>
-    <string name="chat_otr_ended">OTR session ended.</string>
-    <string name="chat_otr_untrusted">Warning: OTR fingerprint not verified.</string>
-    <string name="chat_omemo_trusted">OMEMO: All devices trusted.</string>
-    <string name="chat_omemo_untrusted">OMEMO: Untrusted devices detected.</string>
 
     <!-- Settings -->
     <string name="settings_title">Settings</string>
@@ -95,45 +65,22 @@
     <string name="settings_theme_light">Light</string>
     <string name="settings_theme_dark">Dark</string>
     <string name="settings_language">Language</string>
-    <string name="settings_language_en">English</string>
-    <string name="settings_language_es">Español</string>
-    <string name="settings_language_zh">中文</string>
     <string name="settings_notifications">Notifications</string>
     <string name="settings_notifications_messages">Message notifications</string>
     <string name="settings_notifications_vibrate">Vibrate</string>
     <string name="settings_notifications_sound">Sound</string>
     <string name="settings_encryption">Encryption</string>
-    <string name="settings_omemo_devices">OMEMO Devices</string>
-    <string name="settings_pgp_keys">OpenPGP Keys</string>
-    <string name="settings_otr_fingerprints">OTR Fingerprints</string>
     <string name="settings_default_encryption">Default encryption</string>
     <string name="settings_about">About</string>
     <string name="settings_version">Version</string>
 
     <!-- Common -->
-    <string name="ok">OK</string>
     <string name="cancel">Cancel</string>
     <string name="save">Save</string>
     <string name="delete">Delete</string>
-    <string name="confirm">Confirm</string>
-    <string name="error">Error</string>
-    <string name="loading">Loading…</string>
-    <string name="retry">Retry</string>
     <string name="close">Close</string>
-    <string name="search">Search</string>
-    <string name="clear">Clear</string>
     <string name="back">Back</string>
     <string name="more_options">More options</string>
-
-    <!-- Permissions -->
-    <string name="permission_microphone_title">Microphone Permission</string>
-    <string name="permission_microphone_message">AleJabber needs microphone access to record audio messages.</string>
-    <string name="permission_storage_title">Storage Permission</string>
-    <string name="permission_storage_message">AleJabber needs storage access to send and receive files.</string>
-    <string name="permission_camera_title">Camera Permission</string>
-    <string name="permission_camera_message">AleJabber needs camera access to take photos.</string>
-    <string name="permission_denied">Permission denied. Please grant it in Settings.</string>
-    <string name="open_settings">Open Settings</string>
 
     <!-- Notifications -->
     <string name="notification_channel_messages">Messages</string>
@@ -141,16 +88,8 @@
     <string name="notification_channel_service">XMPP Service</string>
     <string name="notification_channel_service_desc">Background XMPP connection</string>
     <string name="notification_service_running">AleJabber is connected</string>
-    <string name="notification_new_message">New message from %1$s</string>
 
     <!-- Accessibility -->
     <string name="cd_avatar">%1$s\'s avatar</string>
-    <string name="cd_status_indicator">Status: %1$s</string>
     <string name="cd_encryption_badge">Encryption: %1$s</string>
-    <string name="cd_send_button">Send message</string>
-    <string name="cd_attach_button">Attach file</string>
-    <string name="cd_record_button">Record audio message</string>
-    <string name="cd_message_delivered">Message delivered</string>
-    <string name="cd_message_read">Message read</string>
 </resources>
-

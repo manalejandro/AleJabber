@@ -28,23 +28,27 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.ClipboardManager
-import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -76,7 +80,7 @@ fun ChatScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
     val micPermission = rememberPermissionState(Manifest.permission.RECORD_AUDIO)
-    val clipboardManager = LocalClipboardManager.current
+    val clipboard = LocalClipboard.current
 
     // Message selected via long-press → shows the action bottom sheet
     var selectedMessage by remember { mutableStateOf<Message?>(null) }
@@ -226,8 +230,8 @@ fun ChatScreen(
     // ── Message action bottom sheet ───────────────────────────────────────
     selectedMessage?.let { msg ->
         MessageActionsSheet(
-            message        = msg,
-            clipboardManager = clipboardManager,
+            message   = msg,
+            clipboard = clipboard,
             onDelete       = {
                 selectedMessage = null
                 messageToDelete = msg
@@ -281,24 +285,28 @@ private val URL_PATTERN: Pattern = Pattern.compile(
     "(https?://|www\\.)[\\w\\-]+(\\.[\\w\\-]+)+([\\w.,@?^=%&:/~+#\\-_]*[\\w@?^=%&/~+#\\-_])?"
 )
 
-/** Converts a plain string into an [AnnotatedString] with clickable URL spans. */
+/** Converts a plain string into an [AnnotatedString] with clickable URL spans (modern API). */
 fun buildMessageText(text: String, linkColor: Color): AnnotatedString = buildAnnotatedString {
     val matcher = URL_PATTERN.matcher(text)
     var last = 0
     while (matcher.find()) {
-        // Append plain text before the URL
         append(text.substring(last, matcher.start()))
         val url = matcher.group()
         val fullUrl = if (url.startsWith("http")) url else "https://$url"
-        // Append the URL with a distinct style and a string annotation
-        pushStringAnnotation(tag = "URL", annotation = fullUrl)
-        withStyle(SpanStyle(color = linkColor, textDecoration = TextDecoration.Underline)) {
-            append(url)
-        }
-        pop()
+        // Use LinkAnnotation.Url — opens the browser automatically on click.
+        withLink(
+            LinkAnnotation.Url(
+                url    = fullUrl,
+                styles = TextLinkStyles(
+                    style = SpanStyle(
+                        color          = linkColor,
+                        textDecoration = TextDecoration.Underline
+                    )
+                )
+            )
+        ) { append(url) }
         last = matcher.end()
     }
-    // Append remaining plain text
     append(text.substring(last))
 }
 
@@ -344,29 +352,16 @@ fun MessageBubble(message: Message, onLongPress: () -> Unit) {
                 .padding(horizontal = 14.dp, vertical = 8.dp)
         ) {
             when (message.mediaType) {
-                MediaType.TEXT, MediaType.LINK, null -> {
-                    // Build annotated text with clickable URLs
+                MediaType.TEXT, MediaType.LINK -> {
+                    // Build annotated text with clickable URLs via LinkAnnotation.
+                    // Text handles link clicks automatically — no ClickableText needed.
                     val annotated = remember(message.body) {
                         buildMessageText(message.body, linkColor)
                     }
-                    val hasLinks = annotated.getStringAnnotations("URL", 0, annotated.length).isNotEmpty()
-                    if (hasLinks) {
-                        // ClickableText for messages that contain URLs
-                        androidx.compose.foundation.text.ClickableText(
-                            text  = annotated,
-                            style = MaterialTheme.typography.bodyMedium.copy(color = textColor),
-                            onClick = { offset ->
-                                annotated.getStringAnnotations("URL", offset, offset)
-                                    .firstOrNull()?.let { uriHandler.openUri(it.item) }
-                            }
-                        )
-                    } else {
-                        Text(
-                            text  = message.body,
-                            color = textColor,
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    }
+                    Text(
+                        text  = annotated,
+                        style = MaterialTheme.typography.bodyMedium.copy(color = textColor)
+                    )
                 }
                 MediaType.IMAGE -> {
                     AsyncImage(
@@ -457,20 +452,20 @@ fun MessageBubble(message: Message, onLongPress: () -> Unit) {
 @Composable
 fun MessageActionsSheet(
     message: Message,
-    clipboardManager: ClipboardManager,
+    clipboard: androidx.compose.ui.platform.Clipboard,
     onDelete: () -> Unit,
     onDismiss: () -> Unit
 ) {
     val uriHandler  = LocalUriHandler.current
     val sheetState  = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val hasUrl      = URL_PATTERN.matcher(message.body).find()
+    val scope       = rememberCoroutineScope()
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState       = sheetState
     ) {
         Column(modifier = Modifier.padding(bottom = 24.dp)) {
-            // Header preview
             Text(
                 text = message.body.take(120) + if (message.body.length > 120) "…" else "",
                 style  = MaterialTheme.typography.bodySmall,
@@ -479,17 +474,21 @@ fun MessageActionsSheet(
             )
             HorizontalDivider()
 
-            // ── Copy ──────────────────────────────────────────────────────
             ListItem(
                 headlineContent = { Text("Copy text") },
                 leadingContent  = { Icon(Icons.Default.ContentCopy, null) },
                 modifier = Modifier.clickable {
-                    clipboardManager.setText(AnnotatedString(message.body))
+                    scope.launch {
+                        clipboard.setClipEntry(
+                            androidx.compose.ui.platform.ClipEntry(
+                                android.content.ClipData.newPlainText("message", message.body)
+                            )
+                        )
+                    }
                     onDismiss()
                 }
             )
 
-            // ── Open URL ─────────────────────────────────────────────────
             if (hasUrl) {
                 val matcher = URL_PATTERN.matcher(message.body)
                 if (matcher.find()) {
@@ -498,25 +497,23 @@ fun MessageActionsSheet(
                     ListItem(
                         headlineContent  = { Text("Open link") },
                         supportingContent = {
-                            Text(
-                                fullUrl,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.primary,
-                                maxLines = 1
-                            )
+                            Text(fullUrl, style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary, maxLines = 1)
                         },
                         leadingContent = { Icon(Icons.Default.OpenInBrowser, null) },
-                        modifier = Modifier.clickable {
-                            uriHandler.openUri(fullUrl)
-                            onDismiss()
-                        }
+                        modifier = Modifier.clickable { uriHandler.openUri(fullUrl); onDismiss() }
                     )
-                    // Copy link separately
                     ListItem(
                         headlineContent = { Text("Copy link") },
                         leadingContent  = { Icon(Icons.Default.Link, null) },
                         modifier = Modifier.clickable {
-                            clipboardManager.setText(AnnotatedString(fullUrl))
+                            scope.launch {
+                                clipboard.setClipEntry(
+                                    androidx.compose.ui.platform.ClipEntry(
+                                        android.content.ClipData.newPlainText("link", fullUrl)
+                                    )
+                                )
+                            }
                             onDismiss()
                         }
                     )
@@ -525,17 +522,9 @@ fun MessageActionsSheet(
 
             HorizontalDivider()
 
-            // ── Delete ────────────────────────────────────────────────────
             ListItem(
-                headlineContent = {
-                    Text("Delete message", color = MaterialTheme.colorScheme.error)
-                },
-                leadingContent  = {
-                    Icon(
-                        Icons.Default.DeleteForever, null,
-                        tint = MaterialTheme.colorScheme.error
-                    )
-                },
+                headlineContent = { Text("Delete message", color = MaterialTheme.colorScheme.error) },
+                leadingContent  = { Icon(Icons.Default.DeleteForever, null, tint = MaterialTheme.colorScheme.error) },
                 modifier = Modifier.clickable { onDelete() }
             )
 

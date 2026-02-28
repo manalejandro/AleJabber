@@ -31,6 +31,12 @@ android {
     buildFeatures {
         compose = true
     }
+    lint {
+        lintConfig = file("lint.xml")
+        // Warnings do not abort the CI build; only errors do.
+        warningsAsErrors = false
+        abortOnError = true
+    }
     packaging {
         resources {
             excludes += setOf(
@@ -53,8 +59,8 @@ android {
 }
 configurations.all {
     resolutionStrategy {
-        force("org.bouncycastle:bcprov-jdk18on:1.78.1")
-        force("org.bouncycastle:bcpg-jdk18on:1.78.1")
+        force("org.bouncycastle:bcprov-jdk18on:1.83")
+        force("org.bouncycastle:bcpg-jdk18on:1.83")
     }
     // Exclude old BouncyCastle and duplicate xpp3 versions
     exclude(group = "org.bouncycastle", module = "bcprov-jdk15on")

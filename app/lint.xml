@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<lint>
+    <!--
+        TrustAllX509TrustManager: comes from smack-core library (not our code).
+        We cannot fix third-party library internals.
+    -->
+    <issue id="TrustAllX509TrustManager" severity="ignore" />
+
+    <!--
+        NewerVersionAvailable: okhttp 5.x is still alpha/breaking change.
+        Intentionally staying on 4.x until stable.
+    -->
+    <issue id="NewerVersionAvailable">
+        <ignore regexp="com\.squareup\.okhttp3:okhttp" />
+    </issue>
+
+    <!--
+        UnusedResources: strings used only through dynamic references in Settings
+        and resources that are part of the public API surface (kept for future use).
+    -->
+    <issue id="UnusedResources">
+        <ignore regexp="R\.string\.settings_" />
+        <ignore regexp="R\.string\.account_status_" />
+        <ignore regexp="R\.string\.contact_status_" />
+        <ignore regexp="R\.string\.permission_" />
+        <ignore regexp="R\.string\.notification_new_message" />
+        <ignore regexp="R\.string\.cd_" />
+        <ignore regexp="R\.string\.nav_contacts" />
+        <ignore regexp="R\.string\.ok|R\.string\.error|R\.string\.loading|R\.string\.retry|R\.string\.search|R\.string\.clear|R\.string\.confirm|R\.string\.open_settings" />
+        <ignore regexp="R\.string\.chat_otr|R\.string\.chat_omemo|R\.string\.chat_stop|R\.string\.chat_media_" />
+        <ignore regexp="R\.string\.browse_rooms|R\.string\.room_participants|R\.string\.room_topic|R\.string\.rooms_search" />
+        <ignore regexp="R\.string\.contact_remove|R\.string\.contact_block" />
+        <ignore regexp="R\.drawable\.ic_launcher_background" />
+    </issue>
+</lint>

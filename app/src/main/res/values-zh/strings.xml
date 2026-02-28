@@ -1,14 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">AleJabber</string>
 
     <!-- 导航 -->
-    <string name="nav_contacts">联系人</string>
-    <string name="nav_rooms">聊天室</string>
+    <string name="nav_rooms">房间</string>
     <string name="nav_accounts">账号</string>
     <string name="nav_settings">设置</string>
 
     <!-- 账号 -->
-    <string name="accounts_title">账号管理</string>
+    <string name="accounts_title">账号</string>
     <string name="add_account">添加账号</string>
     <string name="edit_account">编辑账号</string>
     <string name="delete_account">删除账号</string>
@@ -17,13 +17,7 @@
     <string name="account_server">服务器</string>
     <string name="account_port">端口</string>
     <string name="account_use_tls">使用 TLS</string>
-    <string name="account_status_online">已连接</string>
-    <string name="account_status_offline">已断开</string>
-    <string name="account_status_connecting">连接中…</string>
-    <string name="account_status_error">连接错误</string>
-    <string name="account_connect">连接</string>
-    <string name="account_disconnect">断开连接</string>
-    <string name="account_no_accounts">尚未配置账号。\n点击 + 添加账号。</string>
+    <string name="account_no_accounts">没有已配置的账号。\n点击 + 添加一个。</string>
     <string name="account_delete_confirm">删除账号 %1$s？</string>
     <string name="account_jid_hint">user@example.com</string>
     <string name="account_resource">资源</string>
@@ -32,42 +26,27 @@
     <!-- 联系人 -->
     <string name="contacts_title">联系人</string>
     <string name="contacts_search">搜索联系人…</string>
-    <string name="contacts_empty">暂无联系人。\n通过 Jabber ID 添加好友。</string>
+    <string name="contacts_empty">还没有联系人。\n使用 Jabber ID 添加朋友。</string>
     <string name="add_contact">添加联系人</string>
     <string name="contact_jid">Jabber ID (JID)</string>
     <string name="contact_nickname">昵称</string>
-    <string name="contact_remove">删除联系人</string>
-    <string name="contact_block">屏蔽联系人</string>
-    <string name="contact_status_online">在线</string>
-    <string name="contact_status_away">离开</string>
-    <string name="contact_status_dnd">请勿打扰</string>
-    <string name="contact_status_offline">离线</string>
 
-    <!-- 聊天室 / MUC -->
-    <string name="rooms_title">聊天室</string>
-    <string name="rooms_search">搜索聊天室…</string>
-    <string name="rooms_empty">尚未加入任何聊天室。</string>
-    <string name="join_room">加入聊天室</string>
-    <string name="room_jid">聊天室 JID</string>
-    <string name="room_nickname">您的昵称</string>
-    <string name="room_password">聊天室密码（可选）</string>
-    <string name="leave_room">退出聊天室</string>
-    <string name="room_participants">参与者</string>
-    <string name="room_topic">主题</string>
-    <string name="browse_rooms">浏览聊天室</string>
+    <!-- 房间 / MUC -->
+    <string name="rooms_title">房间</string>
+    <string name="rooms_empty">还没有加入任何房间。</string>
+    <string name="join_room">加入房间</string>
+    <string name="room_jid">房间 JID</string>
+    <string name="room_nickname">你的昵称</string>
+    <string name="room_password">房间密码</string>
+    <string name="leave_room">离开房间</string>
 
     <!-- 聊天 -->
     <string name="chat_hint">输入消息…</string>
     <string name="chat_send">发送</string>
-    <string name="chat_attach">附件</string>
-    <string name="chat_record_audio">录音</string>
-    <string name="chat_stop_recording">停止录音</string>
+    <string name="chat_attach">附加文件</string>
+    <string name="chat_record_audio">录制音频</string>
     <string name="chat_send_audio">发送音频</string>
     <string name="chat_cancel_audio">取消录音</string>
-    <string name="chat_encryption_none">无加密</string>
-    <string name="chat_encryption_otr">OTR</string>
-    <string name="chat_encryption_omemo">OMEMO</string>
-    <string name="chat_encryption_pgp">OpenPGP</string>
     <string name="chat_encryption_select">选择加密方式</string>
     <string name="chat_message_delivered">已送达</string>
     <string name="chat_message_read">已读</string>
@@ -75,17 +54,9 @@
     <string name="chat_message_failed">发送失败</string>
     <string name="chat_typing">%1$s 正在输入…</string>
     <string name="chat_media_image">图片</string>
-    <string name="chat_media_video">视频</string>
     <string name="chat_media_audio">音频</string>
     <string name="chat_media_file">文件</string>
-    <string name="chat_media_uploading">上传中…</string>
-    <string name="chat_media_download">下载</string>
-    <string name="chat_empty">暂无消息。\n说声你好！</string>
-    <string name="chat_otr_started">OTR 会话已开始，您的对话已加密。</string>
-    <string name="chat_otr_ended">OTR 会话已结束。</string>
-    <string name="chat_otr_untrusted">警告：OTR 指纹未验证。</string>
-    <string name="chat_omemo_trusted">OMEMO：所有设备已信任。</string>
-    <string name="chat_omemo_untrusted">OMEMO：检测到不受信任的设备。</string>
+    <string name="chat_empty">还没有消息。\n说声你好吧！</string>
 
     <!-- 设置 -->
     <string name="settings_title">设置</string>
@@ -95,62 +66,31 @@
     <string name="settings_theme_light">浅色</string>
     <string name="settings_theme_dark">深色</string>
     <string name="settings_language">语言</string>
-    <string name="settings_language_en">English</string>
-    <string name="settings_language_es">Español</string>
-    <string name="settings_language_zh">中文</string>
     <string name="settings_notifications">通知</string>
     <string name="settings_notifications_messages">消息通知</string>
-    <string name="settings_notifications_vibrate">震动</string>
+    <string name="settings_notifications_vibrate">振动</string>
     <string name="settings_notifications_sound">声音</string>
     <string name="settings_encryption">加密</string>
-    <string name="settings_omemo_devices">OMEMO 设备</string>
-    <string name="settings_pgp_keys">OpenPGP 密钥</string>
-    <string name="settings_otr_fingerprints">OTR 指纹</string>
     <string name="settings_default_encryption">默认加密方式</string>
     <string name="settings_about">关于</string>
     <string name="settings_version">版本</string>
 
     <!-- 通用 -->
-    <string name="ok">确定</string>
     <string name="cancel">取消</string>
     <string name="save">保存</string>
     <string name="delete">删除</string>
-    <string name="confirm">确认</string>
-    <string name="error">错误</string>
-    <string name="loading">加载中…</string>
-    <string name="retry">重试</string>
     <string name="close">关闭</string>
-    <string name="search">搜索</string>
-    <string name="clear">清除</string>
     <string name="back">返回</string>
     <string name="more_options">更多选项</string>
 
-    <!-- 权限 -->
-    <string name="permission_microphone_title">麦克风权限</string>
-    <string name="permission_microphone_message">AleJabber 需要麦克风权限来录制语音消息。</string>
-    <string name="permission_storage_title">存储权限</string>
-    <string name="permission_storage_message">AleJabber 需要存储权限来发送和接收文件。</string>
-    <string name="permission_camera_title">相机权限</string>
-    <string name="permission_camera_message">AleJabber 需要相机权限来拍照。</string>
-    <string name="permission_denied">权限被拒绝，请在设置中授予权限。</string>
-    <string name="open_settings">打开设置</string>
-
     <!-- 通知 -->
     <string name="notification_channel_messages">消息</string>
-    <string name="notification_channel_messages_desc">收到的聊天消息</string>
+    <string name="notification_channel_messages_desc">传入的聊天消息</string>
     <string name="notification_channel_service">XMPP 服务</string>
     <string name="notification_channel_service_desc">后台 XMPP 连接</string>
     <string name="notification_service_running">AleJabber 已连接</string>
-    <string name="notification_new_message">来自 %1$s 的新消息</string>
 
     <!-- 无障碍 -->
     <string name="cd_avatar">%1$s 的头像</string>
-    <string name="cd_status_indicator">状态：%1$s</string>
     <string name="cd_encryption_badge">加密：%1$s</string>
-    <string name="cd_send_button">发送消息</string>
-    <string name="cd_attach_button">附件</string>
-    <string name="cd_record_button">录制语音消息</string>
-    <string name="cd_message_delivered">消息已送达</string>
-    <string name="cd_message_read">消息已读</string>
 </resources>
-

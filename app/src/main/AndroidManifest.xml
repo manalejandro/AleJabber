@@ -18,6 +18,8 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.CAMERA" />
+    <!-- required="false" so the app is not excluded from devices without a camera (Chrome OS, etc.) -->
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
 
     <application
         android:name=".AleJabberApp"

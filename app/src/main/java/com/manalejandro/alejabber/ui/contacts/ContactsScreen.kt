@@ -135,14 +135,11 @@ fun ContactsScreen(
                         modifier = Modifier.align(Alignment.Center)
                     )
                 }
-                else -> {
-                    ContactList(
-                        contacts = uiState.filteredContacts,
-                        onContactClick  = { onNavigateToChat(accountId, it.jid) },
-                        onContactLongPress = { detailContact = it },
-                        onRemoveContact = { removeTarget = it }
-                    )
-                }
+                else -> ContactList(
+                    contacts           = uiState.filteredContacts,
+                    onContactClick     = { onNavigateToChat(accountId, it.jid) },
+                    onContactLongPress = { detailContact = it }
+                )
             }
         }
     }
@@ -320,8 +317,7 @@ fun SearchBar(
 fun ContactList(
     contacts: List<Contact>,
     onContactClick: (Contact) -> Unit,
-    onContactLongPress: (Contact) -> Unit,
-    onRemoveContact: (Contact) -> Unit
+    onContactLongPress: (Contact) -> Unit
 ) {
     val presenceOrder = listOf(
         PresenceStatus.ONLINE, PresenceStatus.AWAY, PresenceStatus.DND,
@@ -351,10 +347,9 @@ fun ContactList(
             }
             items(group, key = { "${presence.name}_${it.jid}" }) { contact ->
                 ContactItem(
-                    contact       = contact,
-                    onClick       = { onContactClick(contact) },
-                    onLongPress   = { onContactLongPress(contact) },
-                    onRemove      = { onRemoveContact(contact) }
+                    contact     = contact,
+                    onClick     = { onContactClick(contact) },
+                    onLongPress = { onContactLongPress(contact) }
                 )
             }
         }
@@ -367,8 +362,7 @@ fun ContactList(
 fun ContactItem(
     contact: Contact,
     onClick: () -> Unit,
-    onLongPress: () -> Unit,
-    onRemove: () -> Unit
+    onLongPress: () -> Unit
 ) {
     val displayName = contact.nickname.ifBlank { contact.jid }
 
@@ -388,14 +382,6 @@ fun ContactItem(
                 presence           = contact.presence,
                 contentDescription = stringResource(R.string.cd_avatar, displayName)
             )
-        },
-        trailingContent = {
-            IconButton(onClick = onRemove) {
-                Icon(
-                    Icons.Default.PersonRemove, null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
         },
         modifier = Modifier
             .fillMaxWidth()
@@ -444,9 +430,9 @@ fun AddContactDialog(
 fun EmptyState(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     message: String,
+    modifier: Modifier = Modifier,
     actionLabel: String? = null,
-    onAction: (() -> Unit)? = null,
-    modifier: Modifier = Modifier
+    onAction: (() -> Unit)? = null
 ) {
     Column(
         modifier = modifier.padding(32.dp),

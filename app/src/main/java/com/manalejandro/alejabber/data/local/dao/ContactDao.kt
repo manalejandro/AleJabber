@@ -32,5 +32,8 @@ interface ContactDao {
 
     @Query("UPDATE contacts SET presence = :presence, statusMessage = :statusMessage WHERE accountId = :accountId AND jid = :jid")
     suspend fun updatePresence(accountId: Long, jid: String, presence: String, statusMessage: String)
+
+    @Query("UPDATE contacts SET avatarUrl = :avatarUrl WHERE accountId = :accountId AND jid = :jid")
+    suspend fun updateAvatarUrl(accountId: Long, jid: String, avatarUrl: String?)
 }
 

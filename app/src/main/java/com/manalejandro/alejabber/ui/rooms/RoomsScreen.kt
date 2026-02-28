@@ -222,7 +222,7 @@ fun JoinRoomDialog(
     onJoin: (Long, String, String, String) -> Unit
 ) {
     var selectedAccountId by remember {
-        mutableStateOf(connectedAccounts.firstOrNull()?.id ?: 0L)
+        mutableLongStateOf(connectedAccounts.firstOrNull()?.id ?: 0L)
     }
     var roomJid  by remember { mutableStateOf("") }
     var nickname by remember { mutableStateOf("") }
