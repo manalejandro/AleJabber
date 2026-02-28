@@ -86,6 +86,18 @@ class XmppConnectionManager @Inject constructor() {
     private val _subscriptionRequests = MutableSharedFlow<SubscriptionRequest>(extraBufferCapacity = 32)
     val subscriptionRequests: SharedFlow<SubscriptionRequest> = _subscriptionRequests.asSharedFlow()
 
+    /**
+     * A message interceptor can consume an incoming message before it reaches
+     * the [incomingMessages] flow. Returns true to suppress the message from
+     * the flow (OTR control messages, etc.), false to let it through.
+     */
+    private var messageInterceptor: ((accountId: Long, from: String, body: String) -> Boolean)? = null
+
+    /** Register a single message interceptor (replaces any previous one). */
+    fun setMessageInterceptor(interceptor: (accountId: Long, from: String, body: String) -> Boolean) {
+        messageInterceptor = interceptor
+    }
+
     // ─────────────────────────────────────────────────────────────────────
 
     fun connect(account: Account) {
@@ -334,14 +346,19 @@ class XmppConnectionManager @Inject constructor() {
         val chatManager = ChatManager.getInstanceFor(connection)
         chatManager.addIncomingListener { from, message, _ ->
             val body = message.body ?: return@addIncomingListener
+            val fromStr = from.asBareJid().toString()
             scope.launch {
-                _incomingMessages.emit(
-                    IncomingMessage(
-                        accountId = accountId,
-                        from = from.asBareJid().toString(),
-                        body = body
+                // Let interceptors (e.g. OTR handshake) consume the message first
+                val consumed = messageInterceptor?.invoke(accountId, fromStr, body) ?: false
+                if (!consumed) {
+                    _incomingMessages.emit(
+                        IncomingMessage(
+                            accountId = accountId,
+                            from = fromStr,
+                            body = body
+                        )
                     )
-                )
+                }
             }
         }
     }

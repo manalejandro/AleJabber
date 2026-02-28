@@ -289,13 +289,14 @@ fun ChatScreen(
     // ── Encryption picker ─────────────────────────────────────────────────
     if (uiState.showEncryptionPicker) {
         EncryptionPickerDialog(
-            current     = uiState.encryptionType,
-            omemoState  = uiState.omemoState,
-            pgpHasOwn   = uiState.pgpHasOwnKey,
-            pgpHasCont  = uiState.pgpHasContactKey,
-            otrActive   = uiState.otrActive,
-            onSelect    = viewModel::setEncryption,
-            onDismiss   = viewModel::toggleEncryptionPicker
+            current           = uiState.encryptionType,
+            omemoState        = uiState.omemoState,
+            pgpHasOwn         = uiState.pgpHasOwnKey,
+            pgpHasCont        = uiState.pgpHasContactKey,
+            otrActive         = uiState.otrActive,
+            otrHandshakeState = uiState.otrHandshakeState,
+            onSelect          = viewModel::setEncryption,
+            onDismiss         = viewModel::toggleEncryptionPicker
         )
     }
 
@@ -888,6 +889,7 @@ fun EncryptionPickerDialog(
     pgpHasOwn: Boolean,
     pgpHasCont: Boolean,
     otrActive: Boolean,
+    otrHandshakeState: EncryptionManager.OtrHandshakeState?,
     onSelect: (EncryptionType) -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -905,10 +907,16 @@ fun EncryptionPickerDialog(
                             EncryptionManager.OmemoState.FAILED       -> Triple("✗ Failed", MaterialTheme.colorScheme.error, false)
                             else                                       -> Triple("⏳ Not started", MaterialTheme.colorScheme.onSurfaceVariant, true)
                         }
-                        EncryptionType.OTR     -> if (otrActive)
-                            Triple("✓ Session active", MaterialTheme.colorScheme.primary, true)
-                        else
-                            Triple("New session", MaterialTheme.colorScheme.onSurfaceVariant, true)
+                        EncryptionType.OTR     -> when {
+                            otrHandshakeState == EncryptionManager.OtrHandshakeState.ESTABLISHED ->
+                                Triple("✓ Session active", MaterialTheme.colorScheme.primary, true)
+                            otrHandshakeState == EncryptionManager.OtrHandshakeState.AWAITING_ACK ->
+                                Triple("⏳ Waiting for ACK…", MaterialTheme.colorScheme.onSurfaceVariant, true)
+                            otrActive ->
+                                Triple("⏳ Handshake…", MaterialTheme.colorScheme.onSurfaceVariant, true)
+                            else ->
+                                Triple("New session", MaterialTheme.colorScheme.onSurfaceVariant, true)
+                        }
                         EncryptionType.OPENPGP -> when {
                             !pgpHasOwn  -> Triple("✗ No own key", MaterialTheme.colorScheme.error, false)
                             !pgpHasCont -> Triple("⚠ No contact key", MaterialTheme.colorScheme.tertiary, true)

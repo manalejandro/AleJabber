@@ -7,11 +7,14 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
 import org.jivesoftware.smack.packet.Message
 import org.jivesoftware.smackx.carbons.packet.CarbonExtension
 import org.jivesoftware.smackx.omemo.OmemoManager
@@ -31,13 +34,19 @@ import javax.inject.Singleton
  * Manages OMEMO, OTR and OpenPGP encryption for outgoing messages and
  * decryption of incoming OMEMO-encrypted messages.
  *
- * - OMEMO  : implemented via smack-omemo-signal (Signal Protocol / XEP-0384).
- *            Uses TOFU trust model — all new identities are trusted on first use.
- *            `initializeAsync` is used so the UI thread is never blocked.
- * - OTR    : implemented from scratch with BouncyCastle ECDH + AES-256-CTR.
- *            Session state is kept in memory. Keys are ephemeral per session.
- * - OpenPGP: encrypt with the recipient's public key stored via the Settings screen.
- *            Signing is done with the user's own private key (also in Settings).
+ * ## OTR handshake protocol
+ * OTR requires an ephemeral ECDH key exchange before any message can be encrypted.
+ * The handshake uses two special XMPP message bodies:
+ *
+ *   Initiator → Responder:  `?OTR-INIT:<base64(pubkey)>`
+ *   Responder → Initiator:  `?OTR-ACK:<base64(pubkey)>`
+ *
+ * On receiving ACK/INIT the session keys are derived and subsequent messages
+ * are encrypted as `?OTR:<base64(nonce|ciphertext|hmac)>`.
+ *
+ * Incoming OTR control messages are intercepted in [handleIncomingMessage]
+ * (called from XmppForegroundService / XmppConnectionManager) before they
+ * reach the UI, so the user never sees the raw key exchange strings.
  */
 @Singleton
 class EncryptionManager @Inject constructor(
@@ -47,7 +56,15 @@ class EncryptionManager @Inject constructor(
     private val TAG = "EncryptionManager"
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
-    // ── OMEMO state per account ───────────────────────────────────────────
+    init {
+        // Register OTR message interceptor so handshake messages are processed
+        // transparently and never reach the chat UI as raw text.
+        xmppManager.setMessageInterceptor { accountId, from, body ->
+            handleIncomingMessage(accountId, from, body)
+        }
+    }
+
+    // ── OMEMO ────────────────────────────────────────────────────────────
     enum class OmemoState { IDLE, INITIALISING, READY, FAILED }
 
     private val _omemoState = MutableStateFlow<Map<Long, OmemoState>>(emptyMap())
@@ -55,17 +72,36 @@ class EncryptionManager @Inject constructor(
 
     private var omemoServiceSetup = false
 
-    // ── OTR sessions: (accountId, bareJid) → OtrSession ──────────────────
-    private val otrSessions = mutableMapOf<Pair<Long, String>, OtrSession>()
+    // ── OTR ──────────────────────────────────────────────────────────────
+    /**
+     * Lifecycle of an OTR session:
+     *  IDLE           → no session
+     *  AWAITING_ACK   → we sent INIT, waiting for the remote ACK
+     *  AWAITING_INIT  → we received INIT, sent ACK, waiting to confirm
+     *  ESTABLISHED    → ECDH complete, can encrypt/decrypt
+     */
+    enum class OtrHandshakeState { AWAITING_ACK, AWAITING_INIT, ESTABLISHED }
 
-    // ── OpenPGP manager ───────────────────────────────────────────────────
+    private data class OtrEntry(
+        val session: OtrSession,
+        var state: OtrHandshakeState
+    )
+
+    private val otrEntries = mutableMapOf<Pair<Long, String>, OtrEntry>()
+
+    /** Emitted whenever an OTR session reaches ESTABLISHED. */
+    data class OtrStateEvent(val accountId: Long, val jid: String, val state: OtrHandshakeState)
+
+    private val _otrStateChanges = MutableSharedFlow<OtrStateEvent>(extraBufferCapacity = 16)
+    val otrStateChanges: SharedFlow<OtrStateEvent> = _otrStateChanges.asSharedFlow()
+
+    // ── OpenPGP ───────────────────────────────────────────────────────────
     private val pgpManager = PgpManager(context)
 
     // ─────────────────────────────────────────────────────────────────────
     // OMEMO
     // ─────────────────────────────────────────────────────────────────────
 
-    /** Initialise OMEMO asynchronously for [accountId]. */
     fun initOmemo(accountId: Long) {
         val state = _omemoState.value[accountId]
         if (state == OmemoState.READY || state == OmemoState.INITIALISING) return
@@ -73,7 +109,8 @@ class EncryptionManager @Inject constructor(
         if (!connection.isAuthenticated) return
 
         _omemoState.update { it + (accountId to OmemoState.INITIALISING) }
-        scope.launch {
+        with(scope) {
+            launch {
             try {
                 if (!omemoServiceSetup) {
                     SignalOmemoService.acknowledgeLicense()
@@ -81,20 +118,17 @@ class EncryptionManager @Inject constructor(
                     omemoServiceSetup = true
                 }
                 val omemoManager = OmemoManager.getInstanceFor(connection)
-                // TOFU trust callback — trust every new identity on first encounter
                 omemoManager.setTrustCallback(object : OmemoTrustCallback {
                     override fun getTrust(
                         device: org.jivesoftware.smackx.omemo.internal.OmemoDevice,
                         fingerprint: OmemoFingerprint
                     ): TrustState = TrustState.trusted
-
                     override fun setTrust(
                         device: org.jivesoftware.smackx.omemo.internal.OmemoDevice,
                         fingerprint: OmemoFingerprint,
                         state: TrustState
-                    ) { /* TOFU: ignore */ }
+                    ) { /* TOFU */ }
                 })
-                // Register incoming OMEMO message listener
                 omemoManager.addOmemoMessageListener(object : OmemoMessageListener {
                     override fun onOmemoMessageReceived(
                         stanza: org.jivesoftware.smack.packet.Stanza,
@@ -102,11 +136,9 @@ class EncryptionManager @Inject constructor(
                     ) {
                         val from = stanza.from?.asBareJid()?.toString() ?: return
                         val body = decryptedMessage.body ?: return
-                        scope.launch {
-                            xmppManager.dispatchDecryptedOmemoMessage(accountId, from, body)
-                        }
+                        val encScope = scope
+                        encScope.launch { xmppManager.dispatchDecryptedOmemoMessage(accountId, from, body) }
                     }
-
                     override fun onOmemoCarbonCopyReceived(
                         direction: CarbonExtension.Direction,
                         carbonCopy: Message,
@@ -115,12 +147,10 @@ class EncryptionManager @Inject constructor(
                     ) {
                         val from = carbonCopy.from?.asBareJid()?.toString() ?: return
                         val body = decryptedCarbonCopy.body ?: return
-                        scope.launch {
-                            xmppManager.dispatchDecryptedOmemoMessage(accountId, from, body)
-                        }
+                        val encScope = scope
+                        encScope.launch { xmppManager.dispatchDecryptedOmemoMessage(accountId, from, body) }
                     }
                 })
-                // Use async initialisation so we never block the IO thread during PubSub
                 omemoManager.initializeAsync(object : OmemoManager.InitializationFinishedCallback {
                     override fun initializationFinished(manager: OmemoManager) {
                         _omemoState.update { it + (accountId to OmemoState.READY) }
@@ -135,7 +165,8 @@ class EncryptionManager @Inject constructor(
                 _omemoState.update { it + (accountId to OmemoState.FAILED) }
                 Log.e(TAG, "OMEMO setup error for account $accountId", e)
             }
-        }
+        } // launch
+        } // with(scope)
     }
 
     fun isOmemoReady(accountId: Long) = _omemoState.value[accountId] == OmemoState.READY
@@ -152,28 +183,121 @@ class EncryptionManager @Inject constructor(
         return try {
             val connection = xmppManager.getConnection(accountId) ?: return null
             OmemoManager.getInstanceFor(connection).ownFingerprint.toString()
-        } catch (e: Exception) { null }
+        } catch (_: Exception) { null }
     }
 
     // ─────────────────────────────────────────────────────────────────────
-    // OTR
+    // OTR — public API
     // ─────────────────────────────────────────────────────────────────────
 
-    /** Start or resume an OTR session with [toJid]. */
-    fun startOtrSession(accountId: Long, toJid: String) {
+    /**
+     * Initiates an OTR key exchange with [toJid].
+     * Sends `?OTR-INIT:<base64pubkey>` and waits for the ACK.
+     * Returns a user-visible status string.
+     */
+    fun startOtrSession(accountId: Long, toJid: String): String {
         val key = accountId to toJid
-        if (otrSessions.containsKey(key)) return
-        otrSessions[key] = OtrSession()
-        Log.i(TAG, "OTR session started with $toJid")
+        // If already established, no-op
+        val existing = otrEntries[key]
+        if (existing?.state == OtrHandshakeState.ESTABLISHED) return "OTR session already active."
+
+        val session = OtrSession()
+        otrEntries[key] = OtrEntry(session, OtrHandshakeState.AWAITING_ACK)
+
+        val pubKeyB64 = session.getPublicKeyBase64()
+        val initMsg = "?OTR-INIT:$pubKeyB64"
+        val sent = xmppManager.sendMessage(accountId, toJid, initMsg)
+        return if (sent) "OTR key exchange started — waiting for the other side…"
+        else "OTR: could not send key exchange message."
     }
 
     fun endOtrSession(accountId: Long, toJid: String) {
-        otrSessions.remove(accountId to toJid)
+        otrEntries.remove(accountId to toJid)
         Log.i(TAG, "OTR session ended with $toJid")
     }
 
-    fun isOtrSessionActive(accountId: Long, toJid: String) =
-        otrSessions.containsKey(accountId to toJid)
+    /** True only when the ECDH handshake is complete and messages can be encrypted. */
+    fun isOtrSessionEstablished(accountId: Long, toJid: String): Boolean =
+        otrEntries[accountId to toJid]?.state == OtrHandshakeState.ESTABLISHED
+
+    fun isOtrSessionActive(accountId: Long, toJid: String): Boolean =
+        otrEntries.containsKey(accountId to toJid)
+
+    fun getOtrHandshakeState(accountId: Long, toJid: String): OtrHandshakeState? =
+        otrEntries[accountId to toJid]?.state
+
+    /**
+     * Inspects an incoming message body for OTR control strings.
+     *
+     * @return `true` if the message was an OTR control message (should NOT be shown in UI),
+     *         `false` if it is a normal/encrypted chat message to display.
+     */
+    fun handleIncomingMessage(accountId: Long, fromJid: String, body: String): Boolean {
+        return when {
+            body.startsWith("?OTR-INIT:") -> {
+                // Remote started a session — respond with our key and establish session
+                val remoteKeyB64 = body.removePrefix("?OTR-INIT:")
+                val key = accountId to fromJid
+                val session = OtrSession()
+                otrEntries[key] = OtrEntry(session, OtrHandshakeState.AWAITING_INIT)
+
+                try {
+                    val remoteKeyBytes = android.util.Base64.decode(remoteKeyB64, android.util.Base64.NO_WRAP)
+                    session.setRemotePublicKey(remoteKeyBytes)
+                    otrEntries[key]!!.state = OtrHandshakeState.ESTABLISHED
+                    scope.launch { _otrStateChanges.emit(OtrStateEvent(accountId, fromJid, OtrHandshakeState.ESTABLISHED)) }
+                    Log.i(TAG, "OTR session established with $fromJid (we responded)")
+                } catch (e: Exception) {
+                    Log.e(TAG, "OTR INIT key error from $fromJid", e)
+                    otrEntries.remove(key)
+                }
+
+                // Always send our public key back as ACK
+                val ackMsg = "?OTR-ACK:${session.getPublicKeyBase64()}"
+                xmppManager.sendMessage(accountId, fromJid, ackMsg)
+                true
+            }
+
+            body.startsWith("?OTR-ACK:") -> {
+                // Remote acknowledged our INIT — complete our side of the handshake
+                val remoteKeyB64 = body.removePrefix("?OTR-ACK:")
+                val key = accountId to fromJid
+                val entry = otrEntries[key]
+                if (entry == null) {
+                    Log.w(TAG, "Received OTR-ACK from $fromJid but no pending session")
+                    return true
+                }
+                try {
+                    val remoteKeyBytes = android.util.Base64.decode(remoteKeyB64, android.util.Base64.NO_WRAP)
+                    entry.session.setRemotePublicKey(remoteKeyBytes)
+                    entry.state = OtrHandshakeState.ESTABLISHED
+                    scope.launch { _otrStateChanges.emit(OtrStateEvent(accountId, fromJid, OtrHandshakeState.ESTABLISHED)) }
+                    Log.i(TAG, "OTR session established with $fromJid (we initiated)")
+                } catch (e: Exception) {
+                    Log.e(TAG, "OTR ACK key error from $fromJid", e)
+                    otrEntries.remove(key)
+                }
+                true
+            }
+
+            body.startsWith("?OTR:") -> {
+                // Encrypted OTR message — decrypt and let the caller save it
+                false // caller handles it
+            }
+
+            else -> false // plain text or other protocol
+        }
+    }
+
+    /**
+     * Decrypts an incoming OTR-encrypted message body.
+     * Returns the plaintext, or null if decryption fails.
+     */
+    fun decryptOtrMessage(accountId: Long, fromJid: String, body: String): String? {
+        val entry = otrEntries[accountId to fromJid] ?: return null
+        if (entry.state != OtrHandshakeState.ESTABLISHED) return null
+        return entry.session.decrypt(body)
+    }
 
     // ─────────────────────────────────────────────────────────────────────
     // OpenPGP
@@ -185,12 +309,6 @@ class EncryptionManager @Inject constructor(
     // Unified send
     // ─────────────────────────────────────────────────────────────────────
 
-    /**
-     * Sends [body] to [toJid] with the specified [encryptionType].
-     * Returns (success: Boolean, notice: String?) where notice is a
-     * non-null informational message when the call partially succeeded
-     * (e.g. degraded to plain text).
-     */
     fun sendMessage(
         accountId: Long,
         toJid: String,
@@ -227,18 +345,13 @@ class EncryptionManager @Inject constructor(
             val omemoManager = OmemoManager.getInstanceFor(connection)
             val recipientJid = JidCreate.entityBareFrom(toJid)
             val encrypted    = omemoManager.encrypt(recipientJid, body)
-            // OmemoMessage.Sent — obtain the smack Message via reflection to avoid
-            // depending on the exact method name which differs between smack versions.
             val stanza = omemoSentToMessage(encrypted, toJid)
             connection.sendStanza(stanza)
             true to null
         } catch (e: UndecidedOmemoIdentityException) {
-            // TOFU: trust all undecided identities then retry — the trust callback
-            // already trusts everything on get(), but the exception might still be
-            // thrown if devices were added mid-flight. Just degrade gracefully.
             Log.w(TAG, "OMEMO undecided identities — degrading to plain text: ${e.message}")
             val sent = xmppManager.sendMessage(accountId, toJid, body)
-            if (sent) true to "OMEMO: undecided devices — sent as plain text. Open Settings to manage trust."
+            if (sent) true to "OMEMO: undecided devices — sent as plain text."
             else false to "Send failed"
         } catch (e: CryptoFailedException) {
             Log.e(TAG, "OMEMO crypto failed", e)
@@ -249,20 +362,11 @@ class EncryptionManager @Inject constructor(
         }
     }
 
-    /**
-     * Converts an [OmemoMessage.Sent] to a [Message] stanza ready to send.
-     *
-     * Smack 4.4.x exposes the wrapped Message via one of several method names
-     * depending on the exact patch version. We try known names via reflection
-     * so the code compiles and runs regardless of minor API changes.
-     */
     private fun omemoSentToMessage(sent: OmemoMessage.Sent, toJid: String): Message {
         val bareJid = JidCreate.entityBareFrom(toJid)
-        // Try method names used in different smack 4.4.x versions
         for (methodName in listOf("asMessage", "buildMessage", "toMessage", "getMessage")) {
             try {
-                val m = sent.javaClass.getMethod(methodName,
-                    org.jxmpp.jid.BareJid::class.java)
+                val m = sent.javaClass.getMethod(methodName, org.jxmpp.jid.BareJid::class.java)
                 val result = m.invoke(sent, bareJid)
                 if (result is Message) return result
             } catch (_: NoSuchMethodException) {}
@@ -272,7 +376,6 @@ class EncryptionManager @Inject constructor(
                 if (result is Message) return result
             } catch (_: NoSuchMethodException) {}
         }
-        // Last resort: look for any method returning Message
         for (m in sent.javaClass.methods) {
             if (Message::class.java.isAssignableFrom(m.returnType) && m.parameterCount <= 1) {
                 try {
@@ -289,9 +392,21 @@ class EncryptionManager @Inject constructor(
 
     private fun sendOtr(accountId: Long, toJid: String, body: String): Pair<Boolean, String?> {
         val key = accountId to toJid
-        val session = otrSessions.getOrPut(key) { OtrSession() }
+        val entry = otrEntries[key]
+
+        // If no session at all, start the handshake and inform the user
+        if (entry == null) {
+            val notice = startOtrSession(accountId, toJid)
+            return false to "OTR handshake initiated. $notice Please resend your message once the session is ready."
+        }
+
+        // Handshake in progress — can't encrypt yet
+        if (entry.state != OtrHandshakeState.ESTABLISHED) {
+            return false to "OTR key exchange in progress — please wait a moment and try again."
+        }
+
         return try {
-            val ciphertext = session.encrypt(body)
+            val ciphertext = entry.session.encrypt(body)
             val sent = xmppManager.sendMessage(accountId, toJid, ciphertext)
             if (sent) true to null
             else false to "Send failed"
@@ -311,7 +426,6 @@ class EncryptionManager @Inject constructor(
                 if (sent) true to null
                 else false to "Send failed"
             } else {
-                // No recipient key — fall back to plain
                 val sent = xmppManager.sendMessage(accountId, toJid, body)
                 if (sent) true to "OpenPGP: no key for $toJid — sent as plain text."
                 else false to "Send failed"

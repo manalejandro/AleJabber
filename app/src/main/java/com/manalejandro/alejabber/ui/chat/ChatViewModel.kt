@@ -11,8 +11,10 @@ import com.manalejandro.alejabber.media.AudioRecorder
 import com.manalejandro.alejabber.media.HttpUploadManager
 import com.manalejandro.alejabber.media.RecordingState
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 data class ChatUiState(
@@ -29,6 +31,7 @@ data class ChatUiState(
     val showEncryptionPicker: Boolean = false,
     val omemoState: EncryptionManager.OmemoState = EncryptionManager.OmemoState.IDLE,
     val otrActive: Boolean = false,
+    val otrHandshakeState: EncryptionManager.OtrHandshakeState? = null,
     val pgpHasOwnKey: Boolean = false,
     val pgpHasContactKey: Boolean = false,
     val error: String? = null,
@@ -92,6 +95,24 @@ class ChatViewModel @Inject constructor(
                 _uiState.update { it.copy(omemoState = s) }
             }
         }
+        // Observe OTR handshake state changes
+        viewModelScope.launch {
+            encryptionManager.otrStateChanges.collect { event: EncryptionManager.OtrStateEvent ->
+                val evAccountId = event.accountId
+                val evJid       = event.jid
+                val evState     = event.state
+                if (evAccountId == accountId && evJid == currentJid) {
+                    val established = evState == EncryptionManager.OtrHandshakeState.ESTABLISHED
+                    _uiState.update { s ->
+                        s.copy(
+                            otrHandshakeState = evState,
+                            info = if (established)
+                                "OTR session established — messages are now encrypted end-to-end." else null
+                        )
+                    }
+                }
+            }
+        }
         // Initialise OMEMO if needed
         viewModelScope.launch {
             encryptionManager.initOmemo(accountId)
@@ -100,9 +121,10 @@ class ChatViewModel @Inject constructor(
         val pgp = encryptionManager.pgpManager()
         _uiState.update {
             it.copy(
-                pgpHasOwnKey     = pgp.hasOwnKey(),
-                pgpHasContactKey = pgp.loadContactPublicKeyArmored(jid) != null,
-                otrActive        = encryptionManager.isOtrSessionActive(accountId, jid)
+                pgpHasOwnKey      = pgp.hasOwnKey(),
+                pgpHasContactKey  = pgp.loadContactPublicKeyArmored(jid) != null,
+                otrActive         = encryptionManager.isOtrSessionActive(accountId, jid),
+                otrHandshakeState = encryptionManager.getOtrHandshakeState(accountId, jid)
             )
         }
     }
@@ -120,43 +142,62 @@ class ChatViewModel @Inject constructor(
 
     private suspend fun sendWithEncryption(body: String) {
         val encType = _uiState.value.encryptionType
+
         if (encType == EncryptionType.NONE) {
-            // Fast path — plain text via MessageRepository
-            messageRepository.sendMessage(
+            // Plain text — delegate entirely to MessageRepository (handles PENDING→SENT/FAILED)
+            withContext(Dispatchers.IO) {
+                messageRepository.sendMessage(
+                    accountId      = currentAccountId,
+                    toJid          = currentJid,
+                    body           = body,
+                    encryptionType = EncryptionType.NONE
+                )
+            }
+            return
+        }
+
+        // ── Encrypted path ────────────────────────────────────────────────
+        // 1. Insert PENDING immediately so the message appears in the UI right away.
+        val localId = withContext(Dispatchers.IO) {
+            messageRepository.saveOutgoingMessage(
+                Message(
+                    accountId       = currentAccountId,
+                    conversationJid = currentJid,
+                    fromJid         = "",
+                    toJid           = currentJid,
+                    body            = body,
+                    direction       = MessageDirection.OUTGOING,
+                    status          = MessageStatus.PENDING,
+                    encryptionType  = encType
+                )
+            )
+        }
+
+        // 2. Send the encrypted stanza on IO thread (network I/O).
+        val (ok, notice) = withContext(Dispatchers.IO) {
+            encryptionManager.sendMessage(
                 accountId      = currentAccountId,
                 toJid          = currentJid,
                 body           = body,
-                encryptionType = EncryptionType.NONE
+                encryptionType = encType
             )
-            return
         }
-        // Encrypted path — EncryptionManager handles sending the stanza;
-        // we still persist the message locally.
-        val (ok, errorMsg) = encryptionManager.sendMessage(
-            accountId      = currentAccountId,
-            toJid          = currentJid,
-            body           = body,
-            encryptionType = encType
-        )
-        if (ok) {
-            // Persist as sent (EncryptionManager already sent the stanza)
-            val msg = Message(
-                accountId       = currentAccountId,
-                conversationJid = currentJid,
-                fromJid         = "",
-                toJid           = currentJid,
-                body            = body,
-                direction       = MessageDirection.OUTGOING,
-                status          = MessageStatus.SENT,
-                encryptionType  = encType
+
+        // 3. Update the persisted message status.
+        withContext(Dispatchers.IO) {
+            messageRepository.updateMessageStatus(
+                id     = localId,
+                status = if (ok) MessageStatus.SENT else MessageStatus.FAILED
             )
-            messageRepository.saveOutgoingMessage(msg)
-            errorMsg?.let { notice ->
-                _uiState.update { it.copy(info = notice) }
-            }
+            Unit
+        }
+
+        // 4. Notify the user.
+        if (ok) {
+            notice?.let { _uiState.update { s -> s.copy(info = it) } }
         } else {
-            _uiState.update { it.copy(error = errorMsg ?: "Send failed") }
-            // Revert input so user can retry
+            _uiState.update { it.copy(error = notice ?: "Send failed") }
+            // Put the text back so the user can retry
             _uiState.update { it.copy(inputText = body) }
         }
     }
@@ -214,7 +255,7 @@ class ChatViewModel @Inject constructor(
         val pgpHasOwn  = _uiState.value.pgpHasOwnKey
         val pgpHasCont = _uiState.value.pgpHasContactKey
 
-        val (finalType, notice) = when (type) {
+        val result: Pair<EncryptionType, String?> = when (type) {
             EncryptionType.OMEMO -> when (omemoState) {
                 EncryptionManager.OmemoState.READY -> type to null
                 EncryptionManager.OmemoState.INITIALISING ->
@@ -225,10 +266,11 @@ class ChatViewModel @Inject constructor(
                     type to "OMEMO is starting up…"
             }
             EncryptionType.OTR -> {
-                // Start OTR session
-                encryptionManager.startOtrSession(currentAccountId, currentJid)
+                // startOtrSession sends the INIT message and returns a status string.
+                // The session transitions to ESTABLISHED only after the remote ACK arrives.
+                val notice = encryptionManager.startOtrSession(currentAccountId, currentJid)
                 _uiState.update { it.copy(otrActive = true) }
-                type to "OTR session started. Messages are encrypted end-to-end."
+                type to notice
             }
             EncryptionType.OPENPGP -> when {
                 !pgpHasOwn  -> EncryptionType.NONE to "OpenPGP: You don't have a key pair. Generate one in Settings → Encryption."
@@ -243,6 +285,8 @@ class ChatViewModel @Inject constructor(
                 type to null
             }
         }
+        val finalType = result.first
+        val notice    = result.second
         _uiState.update {
             it.copy(
                 encryptionType       = finalType,

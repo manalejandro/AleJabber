@@ -71,6 +71,10 @@ class MessageRepository @Inject constructor(
     suspend fun clearConversation(accountId: Long, conversationJid: String) =
         messageDao.clearConversation(accountId, conversationJid)
 
+    /** Updates the status of an already-persisted message (e.g. PENDING → SENT/FAILED). */
+    suspend fun updateMessageStatus(id: Long, status: MessageStatus) =
+        messageDao.updateStatus(id, status.name)
+
     /** Persists an already-sent outgoing message (e.g. encrypted via EncryptionManager). */
     suspend fun saveOutgoingMessage(message: Message): Long =
         messageDao.insertMessage(message.toEntity())
