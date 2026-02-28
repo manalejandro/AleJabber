@@ -63,7 +63,7 @@ fun AleJabberNavGraph(
     startDestination: String = Screen.Accounts.route
 ) {
     NavHost(
-        navController = navController,
+        navController    = navController,
         startDestination = startDestination,
         enterTransition = {
             slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Left, tween(280))

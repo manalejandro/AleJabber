@@ -58,6 +58,7 @@ import coil.compose.AsyncImage
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
+import com.manalejandro.alejabber.data.remote.EncryptionManager
 import com.manalejandro.alejabber.R
 import com.manalejandro.alejabber.domain.model.*
 import com.manalejandro.alejabber.media.RecordingState
@@ -81,6 +82,8 @@ fun ChatScreen(
     val listState = rememberLazyListState()
     val micPermission = rememberPermissionState(Manifest.permission.RECORD_AUDIO)
     val clipboard = LocalClipboard.current
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
 
     // Message selected via long-press → shows the action bottom sheet
     var selectedMessage by remember { mutableStateOf<Message?>(null) }
@@ -94,6 +97,21 @@ fun ChatScreen(
 
     LaunchedEffect(accountId, conversationJid) {
         viewModel.init(accountId, conversationJid)
+    }
+
+    // Show error snackbar
+    LaunchedEffect(uiState.error) {
+        uiState.error?.let {
+            snackbarHostState.showSnackbar(it, duration = SnackbarDuration.Long)
+            viewModel.clearError()
+        }
+    }
+    // Show info snackbar
+    LaunchedEffect(uiState.info) {
+        uiState.info?.let {
+            snackbarHostState.showSnackbar(it, duration = SnackbarDuration.Long)
+            viewModel.clearInfo()
+        }
     }
 
     // Scroll to bottom on new message
@@ -114,10 +132,10 @@ fun ChatScreen(
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         AvatarWithStatus(
-                            name = uiState.contactName,
-                            avatarUrl = null,
+                            name     = uiState.contactName,
+                            avatarUrl = uiState.contactAvatarUrl,
                             presence = uiState.contactPresence,
-                            size = 36.dp
+                            size     = 36.dp
                         )
                         Spacer(Modifier.width(10.dp))
                         Column {
@@ -151,7 +169,8 @@ fun ChatScreen(
                     containerColor = MaterialTheme.colorScheme.surface
                 )
             )
-        }
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) }
         // No bottomBar — input is placed inside the content column so imePadding works
     ) { padding ->
         // imePadding() here at the column level makes the whole content
@@ -270,9 +289,13 @@ fun ChatScreen(
     // ── Encryption picker ─────────────────────────────────────────────────
     if (uiState.showEncryptionPicker) {
         EncryptionPickerDialog(
-            current  = uiState.encryptionType,
-            onSelect = viewModel::setEncryption,
-            onDismiss = viewModel::toggleEncryptionPicker
+            current     = uiState.encryptionType,
+            omemoState  = uiState.omemoState,
+            pgpHasOwn   = uiState.pgpHasOwnKey,
+            pgpHasCont  = uiState.pgpHasContactKey,
+            otrActive   = uiState.otrActive,
+            onSelect    = viewModel::setEncryption,
+            onDismiss   = viewModel::toggleEncryptionPicker
         )
     }
 
@@ -861,6 +884,10 @@ fun ChatInput(
 @Composable
 fun EncryptionPickerDialog(
     current: EncryptionType,
+    omemoState: EncryptionManager.OmemoState,
+    pgpHasOwn: Boolean,
+    pgpHasCont: Boolean,
+    otrActive: Boolean,
     onSelect: (EncryptionType) -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -870,21 +897,57 @@ fun EncryptionPickerDialog(
         text = {
             Column {
                 EncryptionType.entries.forEach { type ->
+                    val (statusLabel, statusColor, enabled) = when (type) {
+                        EncryptionType.NONE    -> Triple("", null, true)
+                        EncryptionType.OMEMO   -> when (omemoState) {
+                            EncryptionManager.OmemoState.READY        -> Triple("✓ Ready", MaterialTheme.colorScheme.primary, true)
+                            EncryptionManager.OmemoState.INITIALISING -> Triple("⏳ Initialising…", MaterialTheme.colorScheme.onSurfaceVariant, true)
+                            EncryptionManager.OmemoState.FAILED       -> Triple("✗ Failed", MaterialTheme.colorScheme.error, false)
+                            else                                       -> Triple("⏳ Not started", MaterialTheme.colorScheme.onSurfaceVariant, true)
+                        }
+                        EncryptionType.OTR     -> if (otrActive)
+                            Triple("✓ Session active", MaterialTheme.colorScheme.primary, true)
+                        else
+                            Triple("New session", MaterialTheme.colorScheme.onSurfaceVariant, true)
+                        EncryptionType.OPENPGP -> when {
+                            !pgpHasOwn  -> Triple("✗ No own key", MaterialTheme.colorScheme.error, false)
+                            !pgpHasCont -> Triple("⚠ No contact key", MaterialTheme.colorScheme.tertiary, true)
+                            else        -> Triple("✓ Keys available", MaterialTheme.colorScheme.primary, true)
+                        }
+                    }
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(8.dp))
                             .pointerInput(type) {
-                                detectTapGestures { onSelect(type) }
+                                detectTapGestures { if (enabled) onSelect(type) }
                             }
                             .padding(12.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        RadioButton(selected = current == type, onClick = { onSelect(type) })
+                        RadioButton(
+                            selected = current == type,
+                            onClick  = { if (enabled) onSelect(type) },
+                            enabled  = enabled
+                        )
                         Spacer(Modifier.width(12.dp))
-                        Column {
-                            Text(type.toDisplayName(), fontWeight = FontWeight.Medium)
-                            Text(type.toDescription(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Column(modifier = Modifier.weight(1f)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(type.toDisplayName(), fontWeight = FontWeight.Medium)
+                                if (statusLabel.isNotEmpty()) {
+                                    Spacer(Modifier.width(6.dp))
+                                    Text(
+                                        statusLabel,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = statusColor ?: MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                            Text(
+                                type.toDescription(),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
                     }
                 }

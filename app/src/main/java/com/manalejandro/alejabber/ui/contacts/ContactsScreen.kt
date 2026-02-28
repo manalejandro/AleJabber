@@ -1,10 +1,10 @@
 package com.manalejandro.alejabber.ui.contacts
 
 import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -184,6 +184,42 @@ fun ContactsScreen(
             },
             dismissButton = {
                 TextButton(onClick = { removeTarget = null }) { Text(stringResource(R.string.cancel)) }
+            }
+        )
+    }
+
+    // ── Subscription authorization dialog ─────────────────────────────────
+    uiState.pendingSubscriptionJid?.let { fromJid ->
+        AlertDialog(
+            onDismissRequest = { viewModel.denySubscription() },
+            icon  = { Icon(Icons.Default.PersonAdd, null, tint = MaterialTheme.colorScheme.primary) },
+            title = { Text("Contact request") },
+            text  = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        "$fromJid wants to add you as a contact and see your presence status.",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Text(
+                        "Do you want to accept and add them to your contacts?",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            },
+            confirmButton = {
+                Button(onClick = { viewModel.acceptSubscription() }) {
+                    Icon(Icons.Default.Check, null)
+                    Spacer(Modifier.width(6.dp))
+                    Text("Accept")
+                }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { viewModel.denySubscription() }) {
+                    Icon(Icons.Default.Close, null)
+                    Spacer(Modifier.width(6.dp))
+                    Text("Deny")
+                }
             }
         )
     }

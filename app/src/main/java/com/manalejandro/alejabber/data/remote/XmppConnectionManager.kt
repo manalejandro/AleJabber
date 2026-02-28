@@ -47,6 +47,12 @@ data class PresenceUpdate(
     val statusMessage: String
 )
 
+/** A contact has requested subscription (wants to see our presence). */
+data class SubscriptionRequest(
+    val accountId: Long,
+    val fromJid: String
+)
+
 @Singleton
 class XmppConnectionManager @Inject constructor() {
 
@@ -75,6 +81,10 @@ class XmppConnectionManager @Inject constructor() {
     // ── Presence updates (kept for backward compatibility) ────────────────
     private val _presenceUpdates = MutableSharedFlow<PresenceUpdate>(extraBufferCapacity = 64)
     val presenceUpdates: SharedFlow<PresenceUpdate> = _presenceUpdates.asSharedFlow()
+
+    // ── Incoming subscription requests ───────────────────────────────────
+    private val _subscriptionRequests = MutableSharedFlow<SubscriptionRequest>(extraBufferCapacity = 32)
+    val subscriptionRequests: SharedFlow<SubscriptionRequest> = _subscriptionRequests.asSharedFlow()
 
     // ─────────────────────────────────────────────────────────────────────
 
@@ -161,6 +171,54 @@ class XmppConnectionManager @Inject constructor() {
 
     fun getConnection(accountId: Long): AbstractXMPPConnection? = connections[accountId]
 
+    /**
+     * Called by [EncryptionManager] when an incoming OMEMO message has been
+     * decrypted. Re-emits it through the same [incomingMessages] flow so
+     * [XmppForegroundService] and the chat UI can handle it uniformly.
+     */
+    suspend fun dispatchDecryptedOmemoMessage(accountId: Long, from: String, body: String) {
+        _incomingMessages.emit(
+            IncomingMessage(accountId = accountId, from = from, body = body)
+        )
+    }
+
+    /** Accept a subscription request — send subscribed + subscribe back. */
+    fun acceptSubscription(accountId: Long, fromJid: String) {
+        scope.launch {
+            try {
+                val connection = connections[accountId] ?: return@launch
+                val jid = JidCreate.entityBareFrom(fromJid)
+                // Confirm subscription
+                val subscribed = Presence(Presence.Type.subscribed)
+                subscribed.to = jid
+                connection.sendStanza(subscribed)
+                // Subscribe back (mutual)
+                val subscribe = Presence(Presence.Type.subscribe)
+                subscribe.to = jid
+                connection.sendStanza(subscribe)
+                Log.i(TAG, "Accepted subscription from $fromJid")
+            } catch (e: Exception) {
+                Log.e(TAG, "Accept subscription error", e)
+            }
+        }
+    }
+
+    /** Deny/cancel a subscription request. */
+    fun denySubscription(accountId: Long, fromJid: String) {
+        scope.launch {
+            try {
+                val connection = connections[accountId] ?: return@launch
+                val jid = JidCreate.entityBareFrom(fromJid)
+                val unsubscribed = Presence(Presence.Type.unsubscribed)
+                unsubscribed.to = jid
+                connection.sendStanza(unsubscribed)
+                Log.i(TAG, "Denied subscription from $fromJid")
+            } catch (e: Exception) {
+                Log.e(TAG, "Deny subscription error", e)
+            }
+        }
+    }
+
     // ─────────────────────────────────────────────────────────────────────
 
     private fun buildConfig(account: Account): XMPPTCPConnectionConfiguration {
@@ -185,6 +243,23 @@ class XmppConnectionManager @Inject constructor() {
     private fun setupRoster(accountId: Long, connection: AbstractXMPPConnection) {
         val roster = Roster.getInstanceFor(connection)
         roster.isRosterLoadedAtLogin = true
+        // Manual subscription mode: we handle subscribe/unsubscribe stanzas ourselves
+        roster.subscriptionMode = Roster.SubscriptionMode.manual
+
+        // ── Subscription request listener ─────────────────────────────────
+        connection.addAsyncStanzaListener({ stanza ->
+            val presence = stanza as Presence
+            scope.launch {
+                when (presence.type) {
+                    Presence.Type.subscribe -> {
+                        val fromJid = presence.from?.asBareJid()?.toString() ?: return@launch
+                        Log.i(TAG, "Subscription request from $fromJid")
+                        _subscriptionRequests.emit(SubscriptionRequest(accountId, fromJid))
+                    }
+                    else -> { /* handled by roster listener */ }
+                }
+            }
+        }, org.jivesoftware.smack.filter.StanzaTypeFilter(Presence::class.java))
 
         // ── Snapshot all current presences once the roster is loaded ──────
         scope.launch {

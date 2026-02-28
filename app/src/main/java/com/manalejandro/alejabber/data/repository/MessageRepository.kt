@@ -70,5 +70,9 @@ class MessageRepository @Inject constructor(
 
     suspend fun clearConversation(accountId: Long, conversationJid: String) =
         messageDao.clearConversation(accountId, conversationJid)
+
+    /** Persists an already-sent outgoing message (e.g. encrypted via EncryptionManager). */
+    suspend fun saveOutgoingMessage(message: Message): Long =
+        messageDao.insertMessage(message.toEntity())
 }
 

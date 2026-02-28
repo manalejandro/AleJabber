@@ -38,6 +38,7 @@ class XmppForegroundService : Service() {
         startForeground(AleJabberApp.NOTIFICATION_ID_SERVICE, buildForegroundNotification())
         listenForIncomingMessages()
         listenForPresenceUpdates()
+        listenForSubscriptionRequests()
         connectAllAccounts()
     }
 
@@ -85,6 +86,36 @@ class XmppForegroundService : Service() {
                 )
             }
         }
+    }
+
+    private fun listenForSubscriptionRequests() {
+        serviceScope.launch {
+            xmppManager.subscriptionRequests.collect { req ->
+                showSubscriptionNotification(req.accountId, req.fromJid)
+            }
+        }
+    }
+
+    private fun showSubscriptionNotification(accountId: Long, fromJid: String) {
+        val intent = Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra("subscription_account_id", accountId)
+            putExtra("subscription_from_jid", fromJid)
+        }
+        val pendingIntent = PendingIntent.getActivity(
+            this, fromJid.hashCode(), intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val notification = NotificationCompat.Builder(this, AleJabberApp.CHANNEL_MESSAGES)
+            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setContentTitle("Contact request")
+            .setContentText("$fromJid wants to add you as a contact")
+            .setAutoCancel(true)
+            .setContentIntent(pendingIntent)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .build()
+        val nm = getSystemService(NotificationManager::class.java)
+        nm.notify("sub_${fromJid}".hashCode(), notification)
     }
 
     private fun showMessageNotification(from: String, body: String) {

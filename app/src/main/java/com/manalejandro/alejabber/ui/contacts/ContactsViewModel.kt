@@ -2,6 +2,7 @@ package com.manalejandro.alejabber.ui.contacts
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.manalejandro.alejabber.data.remote.XmppConnectionManager
 import com.manalejandro.alejabber.data.repository.AccountRepository
 import com.manalejandro.alejabber.data.repository.ContactRepository
 import com.manalejandro.alejabber.domain.model.Contact
@@ -31,20 +32,38 @@ data class ContactsUiState(
     val isLoading: Boolean = true,
     val searchQuery: String = "",
     val showAddDialog: Boolean = false,
-    val error: String? = null
+    val error: String? = null,
+    /** JID of a contact requesting subscription (triggers the authorization dialog). */
+    val pendingSubscriptionJid: String? = null,
+    val pendingSubscriptionAccountId: Long = 0
 )
 
 @OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
 @HiltViewModel
 class ContactsViewModel @Inject constructor(
     private val accountRepository: AccountRepository,
-    private val contactRepository: ContactRepository
+    private val contactRepository: ContactRepository,
+    private val xmppManager: XmppConnectionManager
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ContactsUiState())
     val uiState: StateFlow<ContactsUiState> = _uiState.asStateFlow()
 
     private val searchQuery = MutableStateFlow("")
+
+    init {
+        // Listen for incoming subscription requests from any account
+        viewModelScope.launch {
+            xmppManager.subscriptionRequests.collect { req ->
+                _uiState.update {
+                    it.copy(
+                        pendingSubscriptionJid       = req.fromJid,
+                        pendingSubscriptionAccountId = req.accountId
+                    )
+                }
+            }
+        }
+    }
 
     /**
      * Load contacts for the given [accountId].
@@ -140,6 +159,28 @@ class ContactsViewModel @Inject constructor(
                 _uiState.update { it.copy(error = "Sync failed: ${e.message}") }
             }
         }
+    }
+
+    fun acceptSubscription() {
+        val jid       = _uiState.value.pendingSubscriptionJid ?: return
+        val accountId = _uiState.value.pendingSubscriptionAccountId
+        xmppManager.acceptSubscription(accountId, jid)
+        // Optionally add the contact to the roster locally
+        viewModelScope.launch {
+            try {
+                contactRepository.addContact(
+                    Contact(accountId = accountId, jid = jid, nickname = jid)
+                )
+            } catch (_: Exception) {}
+        }
+        _uiState.update { it.copy(pendingSubscriptionJid = null) }
+    }
+
+    fun denySubscription() {
+        val jid       = _uiState.value.pendingSubscriptionJid ?: return
+        val accountId = _uiState.value.pendingSubscriptionAccountId
+        xmppManager.denySubscription(accountId, jid)
+        _uiState.update { it.copy(pendingSubscriptionJid = null) }
     }
 }
 
