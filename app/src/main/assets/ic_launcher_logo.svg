@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  AleJabber Application Icon
+  ===========================
+  Format : SVG 1.1
+  Canvas : 512 × 512 px
+  Design : Chat bubble with XMPP/Jabber lightning bolt and presence indicator dot.
+  Colors :
+    - Background  : Deep Indigo  #1A237E
+    - Bubble      : White        #FFFFFF
+    - Bolt        : Vivid Indigo #3D5AFE
+    - Presence    : Green        #00E676
+  Usage  : app/src/main/res/drawable/ (Android), docs/, store listing.
+-->
+<svg xmlns="http://www.w3.org/2000/svg"
+     viewBox="0 0 512 512"
+     width="512"
+     height="512"
+     role="img"
+     aria-label="AleJabber application icon">
+
+  <title>AleJabber</title>
+  <desc>XMPP/Jabber client icon: a speech bubble with a lightning bolt symbolising fast, secure messaging.</desc>
+
+  <!-- ── Background circle ── -->
+  <circle cx="256" cy="256" r="256" fill="#1A237E"/>
+
+  <!-- ── Subtle inner highlight ── -->
+  <circle cx="256" cy="230" r="180" fill="#283593" opacity="0.6"/>
+
+  <!-- ── Speech bubble (white) ── -->
+  <path d="
+    M 110 110
+    Q  80 110  80 140
+    L  80 310
+    Q  80 340 110 340
+    L 155 340
+    L 140 420
+    L 240 340
+    L 400 340
+    Q 430 340 430 310
+    L 430 140
+    Q 430 110 400 110
+    Z"
+    fill="#FFFFFF"/>
+
+  <!-- ── Speech bubble inner tint ── -->
+  <path d="
+    M 116 118
+    Q  90 118  90 144
+    L  90 306
+    Q  90 332 116 332
+    L 157 332
+    L 144 410
+    L 238 332
+    L 396 332
+    Q 422 332 422 306
+    L 422 144
+    Q 422 118 396 118
+    Z"
+    fill="#C5CAE9" opacity="0.55"/>
+
+  <!-- ── XMPP Lightning bolt (indigo) ── -->
+  <path d="M 300 122 L 210 258 L 258 258 L 192 388 L 322 258 L 270 258 Z"
+        fill="#3D5AFE"/>
+
+  <!-- ── Presence indicator dot (online green) ── -->
+  <circle cx="400" cy="128" r="32" fill="#00E676"/>
+  <circle cx="400" cy="128" r="22" fill="#69F0AE"/>
+
+</svg>
+

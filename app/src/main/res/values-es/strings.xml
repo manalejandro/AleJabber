@@ -1,0 +1,156 @@
+<resources>
+    <string name="app_name">AleJabber</string>
+
+    <!-- Navegación -->
+    <string name="nav_contacts">Contactos</string>
+    <string name="nav_rooms">Salas</string>
+    <string name="nav_accounts">Cuentas</string>
+    <string name="nav_settings">Ajustes</string>
+
+    <!-- Cuentas -->
+    <string name="accounts_title">Cuentas</string>
+    <string name="add_account">Añadir cuenta</string>
+    <string name="edit_account">Editar cuenta</string>
+    <string name="delete_account">Eliminar cuenta</string>
+    <string name="account_username">Usuario (JID)</string>
+    <string name="account_password">Contraseña</string>
+    <string name="account_server">Servidor</string>
+    <string name="account_port">Puerto</string>
+    <string name="account_use_tls">Usar TLS</string>
+    <string name="account_status_online">Conectado</string>
+    <string name="account_status_offline">Desconectado</string>
+    <string name="account_status_connecting">Conectando…</string>
+    <string name="account_status_error">Error de conexión</string>
+    <string name="account_connect">Conectar</string>
+    <string name="account_disconnect">Desconectar</string>
+    <string name="account_no_accounts">No hay cuentas configuradas.\nPulsa + para añadir una.</string>
+    <string name="account_delete_confirm">¿Eliminar la cuenta %1$s?</string>
+    <string name="account_jid_hint">usuario@ejemplo.com</string>
+    <string name="account_resource">Recurso</string>
+    <string name="account_resource_hint">AleJabber</string>
+
+    <!-- Contactos -->
+    <string name="contacts_title">Contactos</string>
+    <string name="contacts_search">Buscar contactos…</string>
+    <string name="contacts_empty">Sin contactos.\nAñade personas con su ID de Jabber.</string>
+    <string name="add_contact">Añadir contacto</string>
+    <string name="contact_jid">ID de Jabber (JID)</string>
+    <string name="contact_nickname">Apodo</string>
+    <string name="contact_remove">Eliminar contacto</string>
+    <string name="contact_block">Bloquear contacto</string>
+    <string name="contact_status_online">En línea</string>
+    <string name="contact_status_away">Ausente</string>
+    <string name="contact_status_dnd">No molestar</string>
+    <string name="contact_status_offline">Desconectado</string>
+
+    <!-- Salas / MUC -->
+    <string name="rooms_title">Salas</string>
+    <string name="rooms_search">Buscar salas…</string>
+    <string name="rooms_empty">No te has unido a ninguna sala.</string>
+    <string name="join_room">Unirse a sala</string>
+    <string name="room_jid">JID de la sala</string>
+    <string name="room_nickname">Tu apodo</string>
+    <string name="room_password">Contraseña (opcional)</string>
+    <string name="leave_room">Salir de la sala</string>
+    <string name="room_participants">Participantes</string>
+    <string name="room_topic">Tema</string>
+    <string name="browse_rooms">Explorar salas</string>
+
+    <!-- Chat -->
+    <string name="chat_hint">Escribe un mensaje…</string>
+    <string name="chat_send">Enviar</string>
+    <string name="chat_attach">Adjuntar archivo</string>
+    <string name="chat_record_audio">Grabar audio</string>
+    <string name="chat_stop_recording">Detener grabación</string>
+    <string name="chat_send_audio">Enviar audio</string>
+    <string name="chat_cancel_audio">Cancelar audio</string>
+    <string name="chat_encryption_none">Sin cifrado</string>
+    <string name="chat_encryption_otr">OTR</string>
+    <string name="chat_encryption_omemo">OMEMO</string>
+    <string name="chat_encryption_pgp">OpenPGP</string>
+    <string name="chat_encryption_select">Seleccionar cifrado</string>
+    <string name="chat_message_delivered">Entregado</string>
+    <string name="chat_message_read">Leído</string>
+    <string name="chat_message_sending">Enviando…</string>
+    <string name="chat_message_failed">Error al enviar</string>
+    <string name="chat_typing">%1$s está escribiendo…</string>
+    <string name="chat_media_image">Imagen</string>
+    <string name="chat_media_video">Vídeo</string>
+    <string name="chat_media_audio">Audio</string>
+    <string name="chat_media_file">Archivo</string>
+    <string name="chat_media_uploading">Subiendo…</string>
+    <string name="chat_media_download">Descargar</string>
+    <string name="chat_empty">Sin mensajes aún.\n¡Di hola!</string>
+    <string name="chat_otr_started">Sesión OTR iniciada. La conversación está cifrada.</string>
+    <string name="chat_otr_ended">Sesión OTR finalizada.</string>
+    <string name="chat_otr_untrusted">Advertencia: Huella OTR no verificada.</string>
+    <string name="chat_omemo_trusted">OMEMO: Todos los dispositivos son de confianza.</string>
+    <string name="chat_omemo_untrusted">OMEMO: Dispositivos no verificados detectados.</string>
+
+    <!-- Ajustes -->
+    <string name="settings_title">Ajustes</string>
+    <string name="settings_appearance">Apariencia</string>
+    <string name="settings_theme">Tema</string>
+    <string name="settings_theme_system">Por defecto del sistema</string>
+    <string name="settings_theme_light">Claro</string>
+    <string name="settings_theme_dark">Oscuro</string>
+    <string name="settings_language">Idioma</string>
+    <string name="settings_language_en">English</string>
+    <string name="settings_language_es">Español</string>
+    <string name="settings_language_zh">中文</string>
+    <string name="settings_notifications">Notificaciones</string>
+    <string name="settings_notifications_messages">Notificaciones de mensajes</string>
+    <string name="settings_notifications_vibrate">Vibrar</string>
+    <string name="settings_notifications_sound">Sonido</string>
+    <string name="settings_encryption">Cifrado</string>
+    <string name="settings_omemo_devices">Dispositivos OMEMO</string>
+    <string name="settings_pgp_keys">Claves OpenPGP</string>
+    <string name="settings_otr_fingerprints">Huellas OTR</string>
+    <string name="settings_default_encryption">Cifrado por defecto</string>
+    <string name="settings_about">Acerca de</string>
+    <string name="settings_version">Versión</string>
+
+    <!-- Común -->
+    <string name="ok">Aceptar</string>
+    <string name="cancel">Cancelar</string>
+    <string name="save">Guardar</string>
+    <string name="delete">Eliminar</string>
+    <string name="confirm">Confirmar</string>
+    <string name="error">Error</string>
+    <string name="loading">Cargando…</string>
+    <string name="retry">Reintentar</string>
+    <string name="close">Cerrar</string>
+    <string name="search">Buscar</string>
+    <string name="clear">Limpiar</string>
+    <string name="back">Atrás</string>
+    <string name="more_options">Más opciones</string>
+
+    <!-- Permisos -->
+    <string name="permission_microphone_title">Permiso de micrófono</string>
+    <string name="permission_microphone_message">AleJabber necesita acceso al micrófono para grabar mensajes de audio.</string>
+    <string name="permission_storage_title">Permiso de almacenamiento</string>
+    <string name="permission_storage_message">AleJabber necesita acceso al almacenamiento para enviar y recibir archivos.</string>
+    <string name="permission_camera_title">Permiso de cámara</string>
+    <string name="permission_camera_message">AleJabber necesita acceso a la cámara para tomar fotos.</string>
+    <string name="permission_denied">Permiso denegado. Por favor, concédelo en Ajustes.</string>
+    <string name="open_settings">Abrir Ajustes</string>
+
+    <!-- Notificaciones -->
+    <string name="notification_channel_messages">Mensajes</string>
+    <string name="notification_channel_messages_desc">Mensajes de chat entrantes</string>
+    <string name="notification_channel_service">Servicio XMPP</string>
+    <string name="notification_channel_service_desc">Conexión XMPP en segundo plano</string>
+    <string name="notification_service_running">AleJabber está conectado</string>
+    <string name="notification_new_message">Nuevo mensaje de %1$s</string>
+
+    <!-- Accesibilidad -->
+    <string name="cd_avatar">Avatar de %1$s</string>
+    <string name="cd_status_indicator">Estado: %1$s</string>
+    <string name="cd_encryption_badge">Cifrado: %1$s</string>
+    <string name="cd_send_button">Enviar mensaje</string>
+    <string name="cd_attach_button">Adjuntar archivo</string>
+    <string name="cd_record_button">Grabar mensaje de audio</string>
+    <string name="cd_message_delivered">Mensaje entregado</string>
+    <string name="cd_message_read">Mensaje leído</string>
+</resources>
+
